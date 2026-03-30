@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Whiteboard</string>
+    <string name="toolbar_title">Toolbar</string>
+    <string name="toolbar_expand">Expand</string>
+    <string name="toolbar_shrink">Shrink</string>
+    <string name="tool_draw">Draw</string>
+    <string name="tool_eraser">Eraser</string>
+    <string name="tool_text">Text</string>
+    <string name="tool_rectangle">Rect</string>
+    <string name="tool_circle">Circle</string>
+    <string name="tool_line">Line</string>
+    <string name="tool_polygon">Polygon</string>
+    <string name="save">Save</string>
+    <string name="load">Load</string>
+</resources>
+
