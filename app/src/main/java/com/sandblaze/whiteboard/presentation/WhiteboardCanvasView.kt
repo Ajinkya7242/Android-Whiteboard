@@ -33,7 +33,6 @@ class WhiteboardCanvasView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
-
     private var viewModel: WhiteboardViewModel? = null
     private var lifecycleOwner: LifecycleOwner? = null
 
