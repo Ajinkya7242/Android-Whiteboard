@@ -73,9 +73,7 @@ Two sample whiteboards are included under:
 
 These are provided for reference (you can copy them into the app’s local storage folder to load them).
 
-## 📱 Try the App
+## 📦 Download APK
 
-👉 [Download APK](.whiteboard.apk)
-
-> Install this APK to test the whiteboard features on your device.
+👉 [Download Whiteboard App](./whiteboard.apk)
 
