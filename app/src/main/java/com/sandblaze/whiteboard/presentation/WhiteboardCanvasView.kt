@@ -184,9 +184,12 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 textPaint.textSize = text.sizeSpToPx(resources.displayMetrics.scaledDensity)
                 textPaint.isSubpixelText = true
                 textPaint.isLinearText = true
-                val lineHeight = (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent) * 1.2f
-                val baseline = text.position.y - textPaint.fontMetrics.ascent
+
+                val fm = textPaint.fontMetrics          // ← capture AFTER textSize is set
+                val lineHeight = (fm.descent - fm.ascent) * 1.2f
+                val baseline = text.position.y - fm.ascent   // first line baseline
                 val lines = text.text.split('\n')
+
                 for (i in lines.indices) {
                     canvas.drawText(lines[i], text.position.x, baseline + (i * lineHeight), textPaint)
                 }
@@ -341,13 +344,12 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 eraseHighlightRadiusPx = eraseRadius
                 lastEraseProcessPoint = point
 
-                val textIdx = vm.findTextIndexNear(point, radiusPx = max(24f, eraseRadius * 0.9f))
+                // Use bounding-box hit test instead of radius from anchor point
+                val textIdx = findTextIndexAtPoint(point, vm)
                 if (textIdx != null) {
-                    // If we are erasing a text: tap deletes full text, drag deletes chars near touch.
                     erasingTextIndex = textIdx
                     erasingTextDownPoint = point
 
-                    // For immediate feedback, delete a single character under the initial touch.
                     val deleted = charIndexForErase(
                         point,
                         vm.state.value.texts[textIdx],
@@ -361,6 +363,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                     erasingTextDownPoint = null
                     vm.eraseAt(point, radiusPx = eraseRadius)
                 }
+                invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
                 eraseHighlightCenter = point
@@ -370,7 +373,6 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 if (last != null) {
                     val dx = point.x - last.x
                     val dy = point.y - last.y
-                    // Skip very tiny move deltas to reduce erase churn on large canvases.
                     if ((dx * dx + dy * dy) < 36f) {
                         invalidate()
                         return
@@ -378,11 +380,17 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 }
                 lastEraseProcessPoint = point
 
-                val textIdx = vm.findTextIndexNear(point, radiusPx = max(24f, eraseRadius * 0.9f))
+                // Use bounding-box hit test here too
+                val textIdx = findTextIndexAtPoint(point, vm)
                 if (textIdx != null) {
-                    // ACTION_MOVE: partial erase while dragging.
                     val activeIdx = erasingTextIndex ?: textIdx
-                    val text = vm.state.value.texts.getOrNull(activeIdx) ?: return
+                    val text = vm.state.value.texts.getOrNull(activeIdx) ?: run {
+                        // activeIdx may be stale if chars were deleted; fall back to current hit
+                        val t = vm.state.value.texts.getOrNull(textIdx) ?: return
+                        val range = charIndexForErase(point, t, resources.displayMetrics.scaledDensity) ?: return
+                        vm.eraseTextRange(textIdx, range.startInclusive, range.endExclusive)
+                        return
+                    }
                     val range = charIndexForErase(
                         point,
                         text,
@@ -394,17 +402,18 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                     erasingTextDownPoint = null
                     vm.eraseAt(point, radiusPx = eraseRadius)
                 }
+                invalidate()
             }
             MotionEvent.ACTION_UP -> {
                 eraseHighlightCenter = null
-                eraseHighlightRadiusPx = eraseRadius
                 lastEraseProcessPoint = null
 
                 val idx = erasingTextIndex
                 if (idx != null) {
                     val down = erasingTextDownPoint ?: point
-                    val movedDist2 = (point.x - down.x).let { dx -> dx * dx } + (point.y - down.y).let { dy -> dy * dy }
-                    // If user "tapped" on the text (no drag), remove whole text entity.
+                    val movedDist2 = (point.x - down.x) * (point.x - down.x) +
+                            (point.y - down.y) * (point.y - down.y)
+                    // Tap (no drag) = delete entire text entity
                     if (movedDist2 < 16f * 16f) {
                         vm.eraseTextRange(idx, 0, Int.MAX_VALUE)
                     }
@@ -412,6 +421,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 erasingTextIndex = null
                 erasingTextDownPoint = null
                 vm.endGesture()
+                invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
                 eraseHighlightCenter = null
@@ -419,9 +429,12 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 erasingTextIndex = null
                 erasingTextDownPoint = null
                 vm.endGesture()
+                invalidate()
             }
         }
     }
+
+
 
     private data class CharEraseRange(val startInclusive: Int, val endExclusive: Int)
 
@@ -440,27 +453,87 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         paint.color = Color.parseColor(text.color.value)
         paint.textSize = text.sizeSpToPx(scaledDensity)
 
-        // Android draws text with the baseline at y; we use the insertion point as baseline (same as drawText()).
-        val touchX = touchPoint.x
-        val startX = text.position.x
-        val relX = touchX - startX
-        if (relX < -40f || relX > paint.measureText(text.text) + 40f) return null
+        val fm = paint.fontMetrics
+        val lineHeight = (fm.descent - fm.ascent) * 1.2f
+        // text.position.y is the TOP of the first line (same as onDraw: baseline = position.y - ascent)
+        val firstBaseline = text.position.y - fm.ascent
+        val firstLineTop = firstBaseline + fm.ascent   // == text.position.y
 
-        var accumulated = 0f
-        var index = 0
-        for (ch in text.text) {
-            val chStr = ch.toString()
-            val w = paint.measureText(chStr)
-            if (relX >= accumulated && relX <= accumulated + w) {
-                // Delete around this character index (1 char).
-                return CharEraseRange(startInclusive = index, endExclusive = index + 1)
-            }
-            accumulated += w
-            index++
+        val lines = text.text.split('\n')
+
+        // 1. Find which line the touch Y falls on
+        val lineIndex = ((touchPoint.y - firstLineTop) / lineHeight).toInt()
+        if (lineIndex < 0 || lineIndex >= lines.size) return null
+
+        // 2. Check touch Y is actually within that line's vertical bounds (with tolerance)
+        val lineTop = firstLineTop + lineIndex * lineHeight
+        val lineBottom = lineTop + lineHeight
+        val yTolerance = lineHeight * 0.4f
+        if (touchPoint.y < lineTop - yTolerance || touchPoint.y > lineBottom + yTolerance) return null
+
+        // 3. Find which character within that line the touch X hits
+        val line = lines[lineIndex]
+        val relX = touchPoint.x - text.position.x
+        if (relX < -40f || relX > paint.measureText(line) + 40f) return null
+
+        // Calculate the absolute character offset into the full string
+        var charOffsetInFullString = 0
+        for (i in 0 until lineIndex) {
+            charOffsetInFullString += lines[i].length + 1 // +1 for the '\n'
         }
 
-        // If we fall outside, delete last char if touch is near the end.
-        return CharEraseRange(startInclusive = text.text.length - 1, endExclusive = text.text.length)
+        // Walk characters in this line to find which one was touched
+        var accumulated = 0f
+        for (i in line.indices) {
+            val w = paint.measureText(line[i].toString())
+            if (relX >= accumulated && relX <= accumulated + w) {
+                val absIndex = charOffsetInFullString + i
+                return CharEraseRange(absIndex, absIndex + 1)
+            }
+            accumulated += w
+        }
+
+        // Touch is past the last character of this line — delete last char of line
+        if (line.isNotEmpty()) {
+            val lastIdx = charOffsetInFullString + line.length - 1
+            return CharEraseRange(lastIdx, lastIdx + 1)
+        }
+        // Line is empty (just a '\n') — delete the newline itself
+        return CharEraseRange(charOffsetInFullString, charOffsetInFullString + 1)
+            .takeIf { charOffsetInFullString < text.text.length }
+    }
+
+
+    private fun findTextIndexAtPoint(point: Point, vm: WhiteboardViewModel): Int? {
+        val texts = vm.state.value.texts
+        val scaledDensity = resources.displayMetrics.scaledDensity
+
+        // Check in reverse so topmost text gets hit first
+        for (i in texts.indices.reversed()) {
+            val text = texts[i]
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = text.sizeSpToPx(scaledDensity)
+            }
+
+            val lines = text.text.split('\n')
+            val lineHeight = (paint.fontMetrics.descent - paint.fontMetrics.ascent) * 1.2f
+            val totalHeight = lineHeight * lines.size
+            val textWidth = lines.maxOf { paint.measureText(it) }
+
+            // Build a generous bounding box around the text
+            val padding = 20f
+            val left = text.position.x - padding
+            val top = text.position.y + paint.fontMetrics.ascent - padding
+            val right = text.position.x + textWidth + padding
+            val bottom = text.position.y + totalHeight + padding
+
+            android.util.Log.d("TextDebug", "Text '${ text.text}' bounds: ($left,$top) -> ($right,$bottom), touch: (${point.x},${point.y})")
+
+            if (point.x in left..right && point.y in top..bottom) {
+                return i
+            }
+        }
+        return null
     }
 
     private var textDragDidMove: Boolean = false
@@ -470,18 +543,22 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         val hitRadius = max(24f, activeStrokeWidthPx * 2f)
         val dragThresholdPx = 10f
 
+
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 android.util.Log.d("TextDebug", "Touch down at world: $point")
                 android.util.Log.d("TextDebug", "All texts: ${vm.state.value.texts.map { "${it.text} @ ${it.position}" }}")
-                val idx = vm.findTextIndexNear(point, hitRadius)
-                android.util.Log.d("TextDebug", "Hit index: $idx, hitRadius: $hitRadius")
+
+                val idx = findTextIndexAtPoint(point, vm)  // ← use this instead of vm.findTextIndexNear
+                android.util.Log.d("TextDebug", "Hit index: $idx")
+
                 if (idx != null) {
                     val text = vm.state.value.texts[idx]
                     draggingTextIndex = idx
                     draggingTextOffset = Point(point.x - text.position.x, point.y - text.position.y)
                     textDragDidMove = false
-                    textDragDownPoint = point  // store original finger-down position
+                    textDragDownPoint = point
                     vm.beginGesture()
                 } else {
                     draggingTextIndex = null
@@ -572,14 +649,19 @@ class WhiteboardCanvasView @JvmOverloads constructor(
             initialColor = existing.color,
             initialSizeSp = existing.sizeSp,
             onSubmit = { result ->
-                vm.updateText(index, result.text, result.color, result.sizeSp)
+                if (result.text.isEmpty()) {
+                    // Empty text = delete the entity
+                    vm.eraseTextRange(index, 0, Int.MAX_VALUE)
+                } else {
+                    vm.updateText(index, result.text, result.color, result.sizeSp)
+                }
             },
             onDelete = {
-                // Delete by erasing at anchor point
                 vm.eraseAt(anchor, radiusPx = max(36f, activeStrokeWidthPx * 2.2f))
             }
         )
     }
+
 
     private fun handleShape(event: MotionEvent, point: Point, vm: WhiteboardViewModel, type: ShapeType) {
         val hitRadius = max(28f, activeStrokeWidthPx * 2.2f)

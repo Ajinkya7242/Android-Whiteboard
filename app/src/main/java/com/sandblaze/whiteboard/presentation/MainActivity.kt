@@ -21,7 +21,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val viewModel: WhiteboardViewModel by viewModels { WhiteboardViewModel.factory(this) }
-    private var isToolbarExpanded: Boolean = true
+    private var isToolbarExpanded: Boolean = false
+    private var selectedColorHex: String = "#000000"
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,8 +60,9 @@ class MainActivity : AppCompatActivity() {
         binding.btnQuickUndo.contentDescription = getString(R.string.undo)
         binding.btnQuickRedo.contentDescription = getString(R.string.redo)
         binding.btnToggleToolbar.setOnClickListener { toggleToolbar() }
+        binding.toolbarContent.visibility = View.GONE
+        binding.toolbarCollapsedQuickBar.visibility = View.VISIBLE
         updateToolbarToggleUi()
-
         binding.btnSave.setOnClickListener {
             viewModel.save(
                 onSuccess = { showMessage("Saved", "Whiteboard saved locally.") },
@@ -107,10 +110,28 @@ class MainActivity : AppCompatActivity() {
             binding.btnColorPurple to "#8E24AA"
         )
 
+        fun updateColorSelection() {
+            for ((button, hex) in colors) {
+                button.backgroundTintList = ColorStateList.valueOf(Color.parseColor(hex))
+                val isSelected = hex.equals(selectedColorHex, ignoreCase = true)
+                button.strokeWidth = if (isSelected) 5 else 2
+                button.strokeColor = if (isSelected)
+                    ColorStateList.valueOf(Color.parseColor("#FFD54F"))  // amber highlight
+                else
+                    ColorStateList.valueOf(Color.parseColor("#CBD5E1"))  // neutral border
+            }
+        }
+
         for ((button, hex) in colors) {
             button.backgroundTintList = ColorStateList.valueOf(Color.parseColor(hex))
-            button.setOnClickListener { viewModel.setColor(hex) }
+            button.setOnClickListener {
+                selectedColorHex = hex
+                viewModel.setColor(hex)
+                updateColorSelection()
+            }
         }
+
+        updateColorSelection() // apply initial highlight on black
     }
 
     private fun updateSelectedToolUi(tool: Tool) {

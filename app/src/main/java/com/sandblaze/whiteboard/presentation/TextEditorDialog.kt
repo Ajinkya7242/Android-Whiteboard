@@ -40,7 +40,7 @@ internal fun showTextEditorDialog(
     )
 
     val input = EditText(context).apply {
-        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or  InputType.TYPE_TEXT_FLAG_MULTI_LINE
         minLines = 2
         maxLines = 4
         isSingleLine = false
@@ -200,9 +200,8 @@ internal fun showTextEditorDialog(
         .setView(scrollView)
         .setPositiveButton(positiveButtonText) { _, _ ->
             val value = input.text?.toString().orEmpty().trim()
-            if (value.isNotEmpty()) {
-                onSubmit(TextEditorResult(value, selectedColor, selectedSizeSp))
-            }
+            onSubmit(TextEditorResult(value, selectedColor, selectedSizeSp))
+
         }
         .setNegativeButton("Cancel", null)
 

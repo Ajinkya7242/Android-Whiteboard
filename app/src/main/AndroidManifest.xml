@@ -5,6 +5,7 @@
         android:allowBackup="true"
         android:label="Whiteboard"
         android:supportsRtl="true"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.Whiteboard">
 
         <activity
