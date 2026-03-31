@@ -1,3 +1,5 @@
+[![Watch Demo](https://img.youtube.com/vi/OUu5SxK1fJk/0.jpg)](https://youtu.be/OUu5SxK1fJk)
+
 # Whiteboard App (IFP)
 
 Offline whiteboard for Interactive Flat Panels (IFP) with local JSON persistence.
@@ -14,7 +16,6 @@ Offline whiteboard for Interactive Flat Panels (IFP) with local JSON persistence
   - Saves `.json` files with timestamp names
   - Load picker lists saved JSON files
 - Undo/Redo with gesture batching (drag counts as one step)
-- Export canvas to PNG (saved locally)
 - Landscape-only activity
 
 ## Architecture (Clean Architecture style)
