@@ -1,4 +1,4 @@
-[![Watch Demo](https://img.youtube.com/vi/0GEIQTQPY00/0.jpg)](https://www.youtube.com/watch?v=0GEIQTQPY00)
+![Image](https://github.com/user-attachments/assets/1b741816-a08a-4f3e-81c9-1e4a6bb8ca96)
 
 # Whiteboard App (IFP)
 
