@@ -112,33 +112,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         }
     }
 
-    fun exportToPng(): File {
-        val w = width
-        val h = height
-        if (w <= 0 || h <= 0) {
-            throw IllegalStateException("Canvas not measured yet.")
-        }
 
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        draw(canvas)
-
-        val dir = context.getExternalFilesDir("whiteboards") ?: context.filesDir
-        if (!dir.exists()) dir.mkdirs()
-        val name = "whiteboard_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.png"
-        val out = File(dir, name)
-        FileOutputStream(out).use { fos ->
-            bmp.compress(Bitmap.CompressFormat.PNG, 100, fos)
-        }
-        return out
-    }
-
-    fun resetView() {
-        viewportOffsetX = 0f
-        viewportOffsetY = 0f
-        viewportScale = 1f
-        invalidate()
-    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -489,54 +463,80 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         return CharEraseRange(startInclusive = text.text.length - 1, endExclusive = text.text.length)
     }
 
+    private var textDragDidMove: Boolean = false
+    private var textDragDownPoint: Point? = null  // tracks original finger-down position
+
     private fun handleText(event: MotionEvent, point: Point, vm: WhiteboardViewModel) {
         val hitRadius = max(24f, activeStrokeWidthPx * 2f)
+        val dragThresholdPx = 10f
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                android.util.Log.d("TextDebug", "Touch down at world: $point")
+                android.util.Log.d("TextDebug", "All texts: ${vm.state.value.texts.map { "${it.text} @ ${it.position}" }}")
                 val idx = vm.findTextIndexNear(point, hitRadius)
+                android.util.Log.d("TextDebug", "Hit index: $idx, hitRadius: $hitRadius")
                 if (idx != null) {
                     val text = vm.state.value.texts[idx]
                     draggingTextIndex = idx
                     draggingTextOffset = Point(point.x - text.position.x, point.y - text.position.y)
+                    textDragDidMove = false
+                    textDragDownPoint = point  // store original finger-down position
                     vm.beginGesture()
                 } else {
                     draggingTextIndex = null
                     draggingTextOffset = null
+                    textDragDidMove = false
+                    textDragDownPoint = null
                 }
             }
+
             MotionEvent.ACTION_MOVE -> {
                 val idx = draggingTextIndex ?: return
                 val offset = draggingTextOffset ?: Point(0f, 0f)
-                vm.moveText(idx, Point(point.x - offset.x, point.y - offset.y))
+                val downPoint = textDragDownPoint ?: return
+
+                // Measure distance from original finger-down, not from current text position
+                val dx = point.x - downPoint.x
+                val dy = point.y - downPoint.y
+                val distFromDown = kotlin.math.sqrt(dx * dx + dy * dy)
+
+                if (distFromDown > dragThresholdPx) {
+                    textDragDidMove = true
+                }
+
+                if (textDragDidMove) {
+                    val newPos = Point(point.x - offset.x, point.y - offset.y)
+                    vm.moveText(idx, newPos)
+                }
             }
+
             MotionEvent.ACTION_UP -> {
                 val idx = draggingTextIndex
-                val moved = idx != null
                 draggingTextIndex = null
                 draggingTextOffset = null
+                val didMove = textDragDidMove
+                textDragDidMove = false
+                textDragDownPoint = null
 
                 if (idx != null) {
                     vm.endGesture()
-                }
-
-                if (moved) {
-                    // Tap-to-edit if finger didn't move much: treat as "edit existing".
-                    if (event.eventTime - event.downTime < 220) {
-                        showEditTextDialog(vm, index = idx!!, anchor = point)
+                    if (!didMove) {
+                        // True tap — open edit dialog
+                        showEditTextDialog(vm, index = idx, anchor = point)
                     }
-                    return
+                } else {
+                    // Tapped empty space — insert new text
+                    showInsertTextDialog(vm, point)
                 }
-
-                // Insert new
-                showInsertTextDialog(vm, point)
             }
+
             MotionEvent.ACTION_CANCEL -> {
-                if (draggingTextIndex != null) {
-                    vm.endGesture()
-                }
+                if (draggingTextIndex != null) vm.endGesture()
                 draggingTextIndex = null
                 draggingTextOffset = null
+                textDragDidMove = false
+                textDragDownPoint = null
             }
         }
     }

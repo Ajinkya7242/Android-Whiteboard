@@ -4,8 +4,10 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
+import android.view.ViewTreeObserver
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -64,13 +66,6 @@ class MainActivity : AppCompatActivity() {
                 onError = { showMessage("Save failed", it.message ?: "Unknown error") }
             )
         }
-
-        binding.btnExportPng.setOnClickListener {
-            runCatching { binding.whiteboardView.exportToPng() }
-                .onSuccess { showMessage("Export PNG", "Exported ${it.name}") }
-                .onFailure { showMessage("Export failed", it.message ?: "Unknown error") }
-        }
-        binding.btnResetView.setOnClickListener { binding.whiteboardView.resetView() }
 
         binding.btnLoad.setOnClickListener {
             viewModel.listSavedFileNames(
