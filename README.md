@@ -73,3 +73,7 @@ Two sample whiteboards are included under:
 
 These are provided for reference (you can copy them into the app’s local storage folder to load them).
 
+## 📦 Download APK
+
+👉 [Download Whiteboard App](./whiteboard.apk)
+
