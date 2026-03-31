@@ -13,10 +13,10 @@ import com.sandblaze.whiteboard.domain.model.StrokeEntity
 import com.sandblaze.whiteboard.domain.model.Rect
 import com.sandblaze.whiteboard.domain.model.TextEntity
 import com.sandblaze.whiteboard.domain.model.WhiteboardState
+import com.sandblaze.whiteboard.domain.usecase.WhiteboardStateReducer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlin.math.min
 
 class WhiteboardViewModel(
     private val repository: WhiteboardRepositoryImpl
@@ -131,10 +131,7 @@ class WhiteboardViewModel(
 
     fun moveText(index: Int, newPosition: Point) {
         val current = _state.value
-        if (index !in current.texts.indices) return
-        val updated = current.texts.toMutableList()
-        updated[index] = updated[index].copy(position = newPosition)
-        setState(current.copy(texts = updated))
+        setState(WhiteboardStateReducer.moveText(current, index, newPosition))
     }
 
     fun editText(index: Int, newValue: String) {
@@ -148,18 +145,8 @@ class WhiteboardViewModel(
     }
 
     fun updateText(index: Int, newValue: String, color: ColorHex, sizeSp: Float) {
-        val value = newValue.trim()
-        if (value.isEmpty()) return
         val current = _state.value
-        if (index !in current.texts.indices) return
-        val safeSize = sizeSp.coerceIn(12f, 96f)
-        val updated = current.texts.toMutableList()
-        updated[index] = updated[index].copy(
-            text = value,
-            color = color,
-            sizeSp = safeSize
-        )
-        setState(current.copy(texts = updated))
+        setState(WhiteboardStateReducer.updateText(current, index, newValue, color, sizeSp))
     }
 
     /**
@@ -168,22 +155,7 @@ class WhiteboardViewModel(
      */
     fun eraseTextRange(index: Int, startInclusive: Int, endExclusive: Int) {
         val current = _state.value
-        if (index !in current.texts.indices) return
-        val original = current.texts[index]
-        if (original.text.isEmpty()) return
-
-        val safeStart = startInclusive.coerceIn(0, original.text.length)
-        val safeEnd = endExclusive.coerceIn(safeStart, original.text.length)
-        if (safeStart == safeEnd) return
-
-        val updatedText = original.text.removeRange(safeStart, safeEnd).trimEnd()
-        val updated = current.texts.toMutableList()
-        if (updatedText.isEmpty()) {
-            updated.removeAt(index)
-        } else {
-            updated[index] = original.copy(text = updatedText)
-        }
-        setState(current.copy(texts = updated))
+        setState(WhiteboardStateReducer.eraseTextRange(current, index, startInclusive, endExclusive))
     }
 
     fun findShapeIndexNear(point: Point, radiusPx: Float): Int? {
@@ -196,64 +168,17 @@ class WhiteboardViewModel(
 
     fun moveShape(index: Int, dx: Float, dy: Float) {
         val current = _state.value
-        if (index !in current.shapes.indices) return
-        val shapes = current.shapes.toMutableList()
-        val old = shapes[index]
-        shapes[index] = when (old) {
-            is ShapeEntity.Rectangle -> old.copy(
-                rect = Rect(
-                    old.rect.left + dx,
-                    old.rect.top + dy,
-                    old.rect.right + dx,
-                    old.rect.bottom + dy
-                )
-            )
-            is ShapeEntity.Circle -> old.copy(center = Point(old.center.x + dx, old.center.y + dy))
-            is ShapeEntity.Line -> old.copy(
-                start = Point(old.start.x + dx, old.start.y + dy),
-                end = Point(old.end.x + dx, old.end.y + dy)
-            )
-            is ShapeEntity.Polygon -> old.copy(
-                bounds = Rect(
-                    old.bounds.left + dx,
-                    old.bounds.top + dy,
-                    old.bounds.right + dx,
-                    old.bounds.bottom + dy
-                )
-            )
-        }
-        setState(current.copy(shapes = shapes))
+        setState(WhiteboardStateReducer.moveShape(current, index, dx, dy))
     }
 
     fun resizeShape(index: Int, newBounds: Rect) {
         val current = _state.value
-        if (index !in current.shapes.indices) return
-        val shapes = current.shapes.toMutableList()
-        val old = shapes[index]
-        shapes[index] = when (old) {
-            is ShapeEntity.Rectangle -> old.copy(rect = newBounds)
-            is ShapeEntity.Circle -> {
-                val radius = min(newBounds.width(), newBounds.height()) / 2f
-                val center = Point(newBounds.centerX(), newBounds.centerY())
-                old.copy(center = center, radius = radius)
-            }
-            is ShapeEntity.Line -> old.copy(
-                start = Point(newBounds.left, newBounds.top),
-                end = Point(newBounds.right, newBounds.bottom)
-            )
-            is ShapeEntity.Polygon -> old.copy(bounds = newBounds)
-        }
-        setState(current.copy(shapes = shapes))
+        setState(WhiteboardStateReducer.resizeShape(current, index, newBounds))
     }
 
     fun eraseAt(point: Point, radiusPx: Float) {
         val current = _state.value
-        val newStrokes = current.strokes.flatMap { stroke ->
-                stroke.erase(point, radiusPx)
-            }
-        val newShapes = current.shapes.filterNot { it.hitTest(point, radiusPx) }
-        val newTexts = current.texts.filterNot { it.hitTest(point, radiusPx) }
-        setState(current.copy(strokes = newStrokes, shapes = newShapes, texts = newTexts))
+        setState(WhiteboardStateReducer.eraseAt(current, point, radiusPx))
     }
 
     fun save(onSuccess: () -> Unit, onError: (Throwable) -> Unit) {

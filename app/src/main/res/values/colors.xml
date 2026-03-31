@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="board_bg">#F4F6FA</color>
+    <color name="canvas_bg">#FFFFFF</color>
+    <color name="toolbar_bg">#FFFFFF</color>
+    <color name="toolbar_title">#1F2937</color>
+    <color name="toolbar_hint">#6B7280</color>
+    <color name="primary_action">#3B82F6</color>
+    <color name="tool_selected_bg">#DBEAFE</color>
+    <color name="tool_selected_stroke">#3B82F6</color>
+    <color name="tool_selected_text">#1D4ED8</color>
+    <color name="tool_unselected_stroke">#CBD5E1</color>
+    <color name="tool_unselected_text">#334155</color>
     <color name="purple_200">#BB86FC</color>
     <color name="purple_500">#6200EE</color>
     <color name="purple_700">#3700B3</color>

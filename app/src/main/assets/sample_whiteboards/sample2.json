@@ -1,0 +1,50 @@
+{
+  "strokes": [
+    {
+      "points": [[60, 140], [90, 120], [130, 125], [170, 150], [210, 165]],
+      "color": "#43A047",
+      "width": 5.0
+    },
+    {
+      "points": [[250, 300], [280, 340], [320, 360], [360, 380]],
+      "color": "#1E88E5",
+      "width": 4.0
+    }
+  ],
+  "shapes": [
+    {
+      "type": "circle",
+      "center": [520, 220],
+      "radius": 90.0,
+      "color": "#43A047"
+    },
+    {
+      "type": "polygon",
+      "sides": 6,
+      "topLeft": [650, 140],
+      "bottomRight": [850, 310],
+      "color": "#FB8C00"
+    },
+    {
+      "type": "line",
+      "start": [430, 340],
+      "end": [610, 430],
+      "color": "#000000"
+    }
+  ],
+  "texts": [
+    {
+      "text": "Sample Board 2",
+      "position": [360, 90],
+      "color": "#000000",
+      "size": 26.0
+    },
+    {
+      "text": "Tap to move",
+      "position": [610, 470],
+      "color": "#1E88E5",
+      "size": 22.0
+    }
+  ]
+}
+

@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Whiteboard</string>
     <string name="toolbar_title">Toolbar</string>
+    <string name="toolbar_hint">IFP tools</string>
     <string name="toolbar_expand">Expand</string>
     <string name="toolbar_shrink">Shrink</string>
     <string name="tool_draw">Draw</string>
@@ -13,5 +14,8 @@
     <string name="tool_polygon">Polygon</string>
     <string name="save">Save</string>
     <string name="load">Load</string>
+    <string name="undo">Undo</string>
+    <string name="redo">Redo</string>
+    <string name="reset_view">Reset View</string>
 </resources>
 

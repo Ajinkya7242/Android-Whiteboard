@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 
 class WhiteboardCanvasView @JvmOverloads constructor(
     context: Context,
@@ -71,6 +70,14 @@ class WhiteboardCanvasView @JvmOverloads constructor(
     private var activeTool: Tool = Tool.Draw
     private var activeColor: ColorHex = ColorHex("#000000")
     private var activeStrokeWidthPx: Float = 6f
+    // Infinite-canvas style viewport offset in world coordinates.
+    private var viewportOffsetX: Float = 0f
+    private var viewportOffsetY: Float = 0f
+    private var viewportScale: Float = 1f
+    private var isPanning: Boolean = false
+    private var lastPanFocusX: Float = 0f
+    private var lastPanFocusY: Float = 0f
+    private var lastPinchDistance: Float = 0f
 
     private var shapeStart: Point? = null
     private var shapePreview: ShapeEntity? = null
@@ -126,95 +133,115 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         return out
     }
 
+    fun resetView() {
+        viewportOffsetX = 0f
+        viewportOffsetY = 0f
+        viewportScale = 1f
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val vm = viewModel ?: return
         val state = vm.state.value
+        canvas.withSave {
+            canvas.scale(viewportScale, viewportScale)
+            canvas.translate(-viewportOffsetX, -viewportOffsetY)
 
-        // Strokes
-        for (stroke in state.strokes) {
-            drawPaint.color = Color.parseColor(stroke.color.value)
-            drawPaint.strokeWidth = stroke.width
-            val p = Path()
-            val points = stroke.points
-            if (points.isNotEmpty()) {
-                p.moveTo(points.first().x, points.first().y)
-                for (i in 1 until points.size) {
-                    val prev = points[i - 1]
-                    val cur = points[i]
-                    val midX = (prev.x + cur.x) / 2f
-                    val midY = (prev.y + cur.y) / 2f
-                    p.quadTo(prev.x, prev.y, midX, midY)
+            // Strokes
+            for (stroke in state.strokes) {
+                drawPaint.color = Color.parseColor(stroke.color.value)
+                drawPaint.strokeWidth = stroke.width
+                val p = Path()
+                val points = stroke.points
+                if (points.isNotEmpty()) {
+                    p.moveTo(points.first().x, points.first().y)
+                    for (i in 1 until points.size) {
+                        val prev = points[i - 1]
+                        val cur = points[i]
+                        val midX = (prev.x + cur.x) / 2f
+                        val midY = (prev.y + cur.y) / 2f
+                        p.quadTo(prev.x, prev.y, midX, midY)
+                    }
+                }
+                canvas.drawPath(p, drawPaint)
+            }
+
+            // Shapes
+            shapePaint.strokeWidth = max(2f, activeStrokeWidthPx)
+            for (shape in state.shapes) {
+                shape.draw(canvas, shapePaint)
+            }
+
+            // Selection outline + corner handles (for shape move/resize).
+            val selectedIdx = selectedShapeIndex
+            if (selectedIdx != null && selectedIdx in state.shapes.indices) {
+                val bounds = ShapeInteraction.bounds(state.shapes[selectedIdx])
+                val selectionColor = Color.parseColor("#FFD54F")
+                val selectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.STROKE
+                    color = selectionColor
+                    strokeWidth = max(3f, activeStrokeWidthPx * 0.7f)
+                    pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    strokeJoin = Paint.Join.ROUND
+                    strokeCap = Paint.Cap.ROUND
+                    alpha = 220
+                }
+                canvas.drawRect(bounds.left, bounds.top, bounds.right, bounds.bottom, selectionPaint)
+
+                val handleR = max(8f, activeStrokeWidthPx * 0.9f)
+                canvas.drawCircle(bounds.left, bounds.top, handleR, selectionPaint)
+                canvas.drawCircle(bounds.right, bounds.top, handleR, selectionPaint)
+                canvas.drawCircle(bounds.left, bounds.bottom, handleR, selectionPaint)
+                canvas.drawCircle(bounds.right, bounds.bottom, handleR, selectionPaint)
+            }
+
+            shapePreview?.let { preview ->
+                canvas.withSave {
+                    shapePaint.alpha = 160
+                    preview.draw(canvas, shapePaint)
+                    shapePaint.alpha = 255
                 }
             }
-            canvas.drawPath(p, drawPaint)
-        }
 
-        // Shapes
-        shapePaint.strokeWidth = max(2f, activeStrokeWidthPx)
-        for (shape in state.shapes) {
-            drawShape(canvas, shapePaint, shape)
-        }
-
-        // Selection outline + corner handles (for shape move/resize).
-        val selectedIdx = selectedShapeIndex
-        if (selectedIdx != null && selectedIdx in state.shapes.indices) {
-            val bounds = shapeBounds(state.shapes[selectedIdx])
-            val selectionColor = Color.parseColor("#FFD54F")
-            val selectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                color = selectionColor
-                strokeWidth = max(3f, activeStrokeWidthPx * 0.7f)
-                pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
-                strokeJoin = Paint.Join.ROUND
-                strokeCap = Paint.Cap.ROUND
-                alpha = 220
+            // Text
+            for (text in state.texts) {
+                textPaint.color = Color.parseColor(text.color.value)
+                textPaint.textSize = text.sizeSpToPx(resources.displayMetrics.scaledDensity)
+                textPaint.isSubpixelText = true
+                textPaint.isLinearText = true
+                val lineHeight = (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent) * 1.2f
+                val baseline = text.position.y - textPaint.fontMetrics.ascent
+                val lines = text.text.split('\n')
+                for (i in lines.indices) {
+                    canvas.drawText(lines[i], text.position.x, baseline + (i * lineHeight), textPaint)
+                }
             }
-            canvas.drawRect(bounds.left, bounds.top, bounds.right, bounds.bottom, selectionPaint)
 
-            val handleR = max(8f, activeStrokeWidthPx * 0.9f)
-            canvas.drawCircle(bounds.left, bounds.top, handleR, selectionPaint)
-            canvas.drawCircle(bounds.right, bounds.top, handleR, selectionPaint)
-            canvas.drawCircle(bounds.left, bounds.bottom, handleR, selectionPaint)
-            canvas.drawCircle(bounds.right, bounds.bottom, handleR, selectionPaint)
-        }
-
-        shapePreview?.let { preview ->
-            canvas.withSave {
-                shapePaint.alpha = 160
-                drawShape(canvas, shapePaint, preview)
-                shapePaint.alpha = 255
+            // In-progress drawing
+            if (!previewPath.isEmpty) {
+                drawPaint.color = Color.parseColor(activeColor.value)
+                drawPaint.strokeWidth = activeStrokeWidthPx
+                canvas.drawPath(previewPath, drawPaint)
             }
-        }
 
-        // Text
-        for (text in state.texts) {
-            textPaint.color = Color.parseColor(text.color.value)
-            textPaint.textSize = text.sizeSpToPx(resources.displayMetrics.scaledDensity)
-            canvas.drawText(text.text, text.position.x, text.position.y, textPaint)
-        }
-
-        // In-progress drawing
-        if (!previewPath.isEmpty) {
-            drawPaint.color = Color.parseColor(activeColor.value)
-            drawPaint.strokeWidth = activeStrokeWidthPx
-            canvas.drawPath(previewPath, drawPaint)
-        }
-
-        // Eraser cursor highlight (optional UX requirement).
-        if (activeTool == Tool.Eraser && eraseHighlightCenter != null) {
-            val center = eraseHighlightCenter!!
-            val r = eraseHighlightRadiusPx
-            eraserHighlightPaint.strokeWidth = max(2f, activeStrokeWidthPx * 0.35f)
-            canvas.drawCircle(center.x, center.y, r, eraserHighlightPaint)
+            // Eraser cursor highlight (optional UX requirement).
+            if (activeTool == Tool.Eraser && eraseHighlightCenter != null) {
+                val center = eraseHighlightCenter!!
+                val r = eraseHighlightRadiusPx
+                eraserHighlightPaint.strokeWidth = max(2f, activeStrokeWidthPx * 0.35f)
+                canvas.drawCircle(center.x, center.y, r, eraserHighlightPaint)
+            }
         }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val vm = viewModel ?: return false
-        val x = event.x
-        val y = event.y
-        val point = Point(x, y)
+        if (event.pointerCount >= 2 || isPanning) {
+            return handlePan(event)
+        }
+
+        val point = screenToWorld(event.x, event.y)
 
         when (activeTool) {
             Tool.Draw -> handleDraw(event, point, vm)
@@ -224,6 +251,84 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         }
 
         return true
+    }
+
+    private fun handlePan(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_DOWN -> {
+                if (event.pointerCount >= 2) {
+                    isPanning = true
+                    lastPanFocusX = focusX(event)
+                    lastPanFocusY = focusY(event)
+                    lastPinchDistance = pinchDistance(event)
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!isPanning || event.pointerCount < 2) return true
+                val fx = focusX(event)
+                val fy = focusY(event)
+                val worldFocusBefore = screenToWorld(fx, fy)
+
+                val currentDistance = pinchDistance(event)
+                if (lastPinchDistance > 0f && currentDistance > 0f) {
+                    val scaleFactor = currentDistance / lastPinchDistance
+                    viewportScale = (viewportScale * scaleFactor).coerceIn(0.5f, 3f)
+                    val worldFocusAfterScale = Point(
+                        x = fx / viewportScale + viewportOffsetX,
+                        y = fy / viewportScale + viewportOffsetY
+                    )
+                    viewportOffsetX += (worldFocusBefore.x - worldFocusAfterScale.x)
+                    viewportOffsetY += (worldFocusBefore.y - worldFocusAfterScale.y)
+                }
+
+                val dx = fx - lastPanFocusX
+                val dy = fy - lastPanFocusY
+                // Move content with fingers: shift viewport opposite to finger movement.
+                viewportOffsetX -= dx / viewportScale
+                viewportOffsetY -= dy / viewportScale
+                lastPanFocusX = fx
+                lastPanFocusY = fy
+                lastPinchDistance = currentDistance
+                invalidate()
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (event.pointerCount <= 2) {
+                    isPanning = false
+                    lastPinchDistance = 0f
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                isPanning = false
+                lastPinchDistance = 0f
+            }
+        }
+        return true
+    }
+
+    private fun focusX(event: MotionEvent): Float {
+        var sum = 0f
+        for (i in 0 until event.pointerCount) sum += event.getX(i)
+        return sum / event.pointerCount
+    }
+
+    private fun focusY(event: MotionEvent): Float {
+        var sum = 0f
+        for (i in 0 until event.pointerCount) sum += event.getY(i)
+        return sum / event.pointerCount
+    }
+
+    private fun pinchDistance(event: MotionEvent): Float {
+        if (event.pointerCount < 2) return 0f
+        val dx = event.getX(0) - event.getX(1)
+        val dy = event.getY(0) - event.getY(1)
+        return kotlin.math.sqrt(dx * dx + dy * dy)
+    }
+
+    private fun screenToWorld(screenX: Float, screenY: Float): Point {
+        return Point(
+            x = screenX / viewportScale + viewportOffsetX,
+            y = screenY / viewportScale + viewportOffsetY
+        )
     }
 
     private fun handleDraw(event: MotionEvent, point: Point, vm: WhiteboardViewModel) {
@@ -492,8 +597,8 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                     vm.beginGesture()
 
                     val shape = vm.state.value.shapes[selectedIdx]
-                    val bounds = shapeBounds(shape)
-                    val fixed = fixedCornerForResize(point, bounds, handleTol)
+                    val bounds = ShapeInteraction.bounds(shape)
+                    val fixed = ShapeInteraction.fixedCornerForResize(point, bounds, handleTol)
                     shapeResizeFixedCorner = fixed
                 } else {
                     selectedShapeIndex = null
@@ -510,10 +615,10 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                     val fixedCorner = shapeResizeFixedCorner
                     if (fixedCorner != null) {
                         val newBounds = Rect(
-                            left = min(fixedCorner.x, point.x),
-                            top = min(fixedCorner.y, point.y),
-                            right = max(fixedCorner.x, point.x),
-                            bottom = max(fixedCorner.y, point.y)
+                            left = kotlin.math.min(fixedCorner.x, point.x),
+                            top = kotlin.math.min(fixedCorner.y, point.y),
+                            right = kotlin.math.max(fixedCorner.x, point.x),
+                            bottom = kotlin.math.max(fixedCorner.y, point.y)
                         )
                         vm.resizeShape(idx, newBounds)
                     } else {
@@ -526,7 +631,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                     invalidate()
                 } else {
                     val start = shapeStart ?: return
-                    shapePreview = shapeFromDrag(type, start, point, activeColor)
+                    shapePreview = ShapeInteraction.shapeFromDrag(type, start, point, activeColor)
                     invalidate()
                 }
             }
@@ -544,93 +649,13 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 val start = shapeStart
                 val end = point
                 if (start != null) {
-                    val committed = shapeFromDrag(type, start, end, activeColor)
+                    val committed = ShapeInteraction.shapeFromDrag(type, start, end, activeColor)
                     vm.commitShape(committed)
                 }
                 shapeStart = null
                 shapePreview = null
                 invalidate()
             }
-        }
-    }
-
-    private fun shapeBounds(shape: ShapeEntity): Rect = when (shape) {
-        is ShapeEntity.Rectangle -> shape.rect
-        is ShapeEntity.Circle -> {
-            val r = shape.radius
-            Rect(
-                left = shape.center.x - r,
-                top = shape.center.y - r,
-                right = shape.center.x + r,
-                bottom = shape.center.y + r
-            )
-        }
-        is ShapeEntity.Line -> {
-            Rect(
-                left = min(shape.start.x, shape.end.x),
-                top = min(shape.start.y, shape.end.y),
-                right = max(shape.start.x, shape.end.x),
-                bottom = max(shape.start.y, shape.end.y)
-            )
-        }
-        is ShapeEntity.Polygon -> shape.bounds
-    }
-
-    /**
-     * Returns the opposite corner to the one near which the user touched.
-     * When the finger drags, we build a new rect from (fixedCorner, currentTouch).
-     */
-    private fun fixedCornerForResize(touch: Point, bounds: Rect, tolerancePx: Float): Point? {
-        val tl = Point(bounds.left, bounds.top)
-        val tr = Point(bounds.right, bounds.top)
-        val bl = Point(bounds.left, bounds.bottom)
-        val br = Point(bounds.right, bounds.bottom)
-
-        fun dist2(a: Point, b: Point): Float {
-            val dx = a.x - b.x
-            val dy = a.y - b.y
-            return dx * dx + dy * dy
-        }
-
-        val tol2 = tolerancePx * tolerancePx
-        val dTL = dist2(touch, tl)
-        val dTR = dist2(touch, tr)
-        val dBL = dist2(touch, bl)
-        val dBR = dist2(touch, br)
-
-        val nearest = minOf(dTL, dTR, dBL, dBR)
-        if (nearest > tol2) return null
-
-        return when (nearest) {
-            dTL -> br
-            dTR -> bl
-            dBL -> tr
-            else -> tl // dBR
-        }
-    }
-
-    private fun shapeFromDrag(type: ShapeType, start: Point, end: Point, color: ColorHex): ShapeEntity {
-        val left = min(start.x, end.x)
-        val top = min(start.y, end.y)
-        val right = max(start.x, end.x)
-        val bottom = max(start.y, end.y)
-        return when (type) {
-            ShapeType.Rectangle -> ShapeEntity.Rectangle(
-                rect = Rect(left, top, right, bottom),
-                color = color
-            )
-            ShapeType.Circle -> {
-                val cx = (left + right) / 2f
-                val cy = (top + bottom) / 2f
-                val radius = min(right - left, bottom - top) / 2f
-                ShapeEntity.Circle(center = Point(cx, cy), radius = radius, color = color)
-            }
-            ShapeType.Line -> ShapeEntity.Line(start = start, end = end, color = color)
-            is ShapeType.Polygon -> ShapeEntity.Polygon(
-                bounds = Rect(left, top, right, bottom),
-                sides = max(4, type.sides),
-                color = color
-            )
         }
     }
 
@@ -641,30 +666,5 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         val color: ColorHex
     )
 
-    private fun drawShape(canvas: Canvas, paint: Paint, shape: ShapeEntity) {
-        paint.color = Color.parseColor(shape.color.value)
-        when (shape) {
-            is ShapeEntity.Rectangle -> {
-                canvas.drawRect(shape.rect.left, shape.rect.top, shape.rect.right, shape.rect.bottom, paint)
-            }
-            is ShapeEntity.Circle -> {
-                canvas.drawCircle(shape.center.x, shape.center.y, shape.radius, paint)
-            }
-            is ShapeEntity.Line -> {
-                canvas.drawLine(shape.start.x, shape.start.y, shape.end.x, shape.end.y, paint)
-            }
-            is ShapeEntity.Polygon -> {
-                val vertices = shape.vertices()
-                if (vertices.isEmpty()) return
-                val path = Path()
-                path.moveTo(vertices.first().x, vertices.first().y)
-                for (i in 1 until vertices.size) {
-                    path.lineTo(vertices[i].x, vertices[i].y)
-                }
-                path.close()
-                canvas.drawPath(path, paint)
-            }
-        }
-    }
 }
 

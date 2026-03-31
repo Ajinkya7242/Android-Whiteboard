@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="screen_padding">12dp</dimen>
+    <dimen name="canvas_corner_radius">16dp</dimen>
+    <dimen name="toolbar_corner_radius">18dp</dimen>
+    <dimen name="toolbar_padding">14dp</dimen>
+    <dimen name="button_height_primary">52dp</dimen>
+    <dimen name="button_height_secondary">48dp</dimen>
+    <dimen name="color_button_size">44dp</dimen>
+    <dimen name="toolbar_title_size">18sp</dimen>
+</resources>

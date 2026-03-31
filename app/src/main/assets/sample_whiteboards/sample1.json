@@ -1,0 +1,26 @@
+{
+  "strokes": [
+    {
+      "points": [[80, 200], [120, 210], [160, 220], [220, 240]],
+      "color": "#E53935",
+      "width": 6.0
+    }
+  ],
+  "shapes": [
+    {
+      "type": "rectangle",
+      "topLeft": [400, 120],
+      "bottomRight": [600, 260],
+      "color": "#1E88E5"
+    }
+  ],
+  "texts": [
+    {
+      "text": "Hello IFP!",
+      "position": [350, 380],
+      "color": "#000000",
+      "size": 24.0
+    }
+  ]
+}
+

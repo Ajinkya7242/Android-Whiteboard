@@ -3,266 +3,551 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/board_bg">
 
-    <com.sandblaze.whiteboard.presentation.WhiteboardCanvasView
-        android:id="@+id/whiteboardView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@android:color/white"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/toolbar"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
-    <com.google.android.material.card.MaterialCardView
+    <ScrollView
         android:id="@+id/toolbar"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="12dp"
+        android:layout_marginStart="@dimen/screen_padding"
+        android:layout_marginEnd="@dimen/screen_padding"
+        android:layout_marginBottom="@dimen/screen_padding"
+        app:cardBackgroundColor="@color/toolbar_bg"
+        app:cardCornerRadius="@dimen/toolbar_corner_radius"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:cardElevation="4dp">
-
-        <LinearLayout
+        app:cardElevation="8dp">
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:layout_marginStart="@dimen/screen_padding"
+                android:layout_marginEnd="@dimen/screen_padding"
+                android:layout_marginBottom="@dimen/screen_padding"
+                app:cardBackgroundColor="@color/toolbar_bg"
+                app:cardCornerRadius="@dimen/toolbar_corner_radius"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:cardElevation="8dp">
 
-                <TextView
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/toolbar_title"
-                    android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1" />
+                    android:orientation="vertical"
+                    android:padding="@dimen/toolbar_padding">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnToggleToolbar"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="44dp"
-                    android:minWidth="0dp"
-                    app:icon="@drawable/ic_arrow_down"
-                    app:iconGravity="textStart"
-                    app:iconPadding="0dp"
-                    android:text="" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-            </LinearLayout>
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/toolbar_title"
+                            android:textColor="@color/toolbar_title"
+                            android:textSize="@dimen/toolbar_title_size"
+                            android:textStyle="bold" />
 
-            <LinearLayout
-                android:id="@+id/toolbarContent"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:text="@string/toolbar_hint"
+                            android:textColor="@color/toolbar_hint"
+                            android:textSize="12sp" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnToggleToolbar"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="56dp"
+                            android:minWidth="132dp"
+                            android:paddingStart="16dp"
+                            android:paddingEnd="16dp"
+                            app:icon="@drawable/ic_arrow_down"
+                            app:iconGravity="textStart"
+                            app:iconPadding="8dp"
+                            android:text="@string/toolbar_shrink" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDraw"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:text="@string/tool_draw"/>
+                    </LinearLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnEraser"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/tool_eraser"/>
+                    <LinearLayout
+                        android:id="@+id/toolbarCollapsedQuickBar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnText"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/tool_text"/>
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="10dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSave"
-                    style="@style/Widget.MaterialComponents.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/save"/>
+                            <ImageView
+                                android:id="@+id/ivCollapsedCurrentTool"
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:src="@drawable/ic_tool_draw"
+                                android:tint="@color/tool_selected_text" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLoad"
-                    style="@style/Widget.MaterialComponents.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/load"/>
-            </LinearLayout>
+                            <TextView
+                                android:id="@+id/tvCollapsedCurrentTool"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="Draw"
+                                android:textColor="@color/tool_selected_text"
+                                android:textStyle="bold" />
+                        </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:orientation="horizontal">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickDraw"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/button_height_secondary"
+                            android:layout_weight="1"
+                            android:checkable="true"
+                            android:minWidth="0dp"
+                            android:text=""
+                            app:icon="@drawable/ic_tool_draw"
+                            app:iconGravity="textTop"
+                            app:iconPadding="0dp"
+                            app:iconSize="20dp"
+                            app:cornerRadius="12dp"
+                            />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnUndo"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:text="Undo"/>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickEraser"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/button_height_secondary"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:checkable="true"
+                            android:minWidth="0dp"
+                            android:text=""
+                            app:icon="@drawable/ic_tool_eraser"
+                            app:iconGravity="textTop"
+                            app:iconPadding="0dp"
+                            app:iconSize="20dp"
+                            app:cornerRadius="12dp"
+                            />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRedo"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="Redo"/>
-            </LinearLayout>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickText"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/button_height_secondary"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:checkable="true"
+                            android:minWidth="0dp"
+                            android:text=""
+                            app:icon="@drawable/ic_tool_text"
+                            app:iconGravity="textTop"
+                            app:iconPadding="0dp"
+                            app:iconSize="20dp"
+                            app:cornerRadius="12dp"
+                            />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:orientation="horizontal">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickUndo"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/button_height_secondary"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:minWidth="0dp"
+                            android:text=""
+                            app:icon="@drawable/ic_tool_undo"
+                            app:iconGravity="textTop"
+                            app:iconPadding="0dp"
+                            app:iconSize="20dp"
+                            app:cornerRadius="12dp"
+                            />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRect"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_weight="1"
-                    android:text="@string/tool_rectangle"/>
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickRedo"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/button_height_secondary"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:minWidth="0dp"
+                            android:text=""
+                            app:icon="@drawable/ic_tool_redo"
+                            app:iconGravity="textTop"
+                            app:iconPadding="0dp"
+                            app:iconSize="20dp"
+                            app:cornerRadius="12dp"
+                            />
+                    </LinearLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnCircle"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/tool_circle"/>
+                    <LinearLayout
+                        android:id="@+id/toolbarContent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLine"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/tool_line"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Tools"
+                            android:textColor="@color/toolbar_hint"
+                            android:textStyle="bold" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPolygon"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="52dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/tool_polygon"/>
-            </LinearLayout>
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
 
-            <com.google.android.material.slider.Slider
-                android:id="@+id/strokeWidthSlider"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:valueFrom="2"
-                android:valueTo="24"
-                android:stepSize="1"/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnDraw"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_primary"
+                                android:layout_weight="1"
+                                android:checkable="true"
+                                app:icon="@drawable/ic_tool_draw"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="@string/tool_draw"/>
 
-            <LinearLayout
-                android:id="@+id/colorPalette"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnEraser"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_primary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:checkable="true"
+                                app:icon="@drawable/ic_tool_eraser"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="@string/tool_eraser"/>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnColorBlack"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text=""/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnText"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_primary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:checkable="true"
+                                app:icon="@drawable/ic_tool_text"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="@string/tool_text"/>
+                        </LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="History"
+                            android:textColor="@color/toolbar_hint"
+                            android:textStyle="bold" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnColorRed"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text=""/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnUndo"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_weight="1"
+                                app:icon="@drawable/ic_tool_undo"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="Undo"/>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnColorBlue"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text=""/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnRedo"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                app:icon="@drawable/ic_tool_redo"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="Redo"/>
+                        </LinearLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnColorGreen"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text=""/>
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginTop="10dp"
+                            android:layout_marginBottom="10dp"
+                            android:background="@color/tool_unselected_stroke" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnColorOrange"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text=""/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Shapes"
+                            android:textColor="@color/toolbar_hint"
+                            android:textStyle="bold" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnColorPurple"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text=""/>
-            </LinearLayout>
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnExportPng"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="8dp"
-                android:text="Export PNG"/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnRect"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_weight="1"
+                                android:checkable="true"
+                                app:icon="@drawable/ic_tool_rect"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="@string/tool_rectangle"/>
 
-            </LinearLayout>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnCircle"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:checkable="true"
+                                app:icon="@drawable/ic_tool_circle"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="@string/tool_circle"/>
 
-        </LinearLayout>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnLine"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:checkable="true"
+                                app:icon="@drawable/ic_tool_line"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="@string/tool_line"/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnPolygon"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:checkable="true"
+                                app:icon="@drawable/ic_tool_polygon"
+                                app:iconGravity="textStart"
+                                app:iconPadding="8dp"
+                                app:iconSize="18dp"
+                                app:cornerRadius="12dp"
+                                android:text="@string/tool_polygon"/>
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="Stroke"
+                            android:textColor="@color/toolbar_hint"
+                            android:textStyle="bold" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/strokeWidthSlider"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:valueFrom="2"
+                            android:valueTo="24"
+                            android:stepSize="1"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Colors"
+                            android:textColor="@color/toolbar_hint"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:id="@+id/colorPalette"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnColorBlack"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="@dimen/color_button_size"
+                                android:layout_height="@dimen/color_button_size"
+                                app:cornerRadius="22dp"
+                                android:text=""/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnColorRed"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="@dimen/color_button_size"
+                                android:layout_height="@dimen/color_button_size"
+                                android:layout_marginStart="8dp"
+                                app:cornerRadius="22dp"
+                                android:text=""/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnColorBlue"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="@dimen/color_button_size"
+                                android:layout_height="@dimen/color_button_size"
+                                android:layout_marginStart="8dp"
+                                app:cornerRadius="22dp"
+                                android:text=""/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnColorGreen"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="@dimen/color_button_size"
+                                android:layout_height="@dimen/color_button_size"
+                                android:layout_marginStart="8dp"
+                                app:cornerRadius="22dp"
+                                android:text=""/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnColorOrange"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="@dimen/color_button_size"
+                                android:layout_height="@dimen/color_button_size"
+                                android:layout_marginStart="8dp"
+                                app:cornerRadius="22dp"
+                                android:text=""/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnColorPurple"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="@dimen/color_button_size"
+                                android:layout_height="@dimen/color_button_size"
+                                android:layout_marginStart="8dp"
+                                app:cornerRadius="22dp"
+                                android:text=""/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnExportPng"
+                                style="@style/Widget.MaterialComponents.Button"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_weight="1"
+                                app:cornerRadius="12dp"
+                                android:text="Export PNG"/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnResetView"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                app:cornerRadius="12dp"
+                                android:text="@string/reset_view"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnSave"
+                                style="@style/Widget.MaterialComponents.Button"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_weight="1"
+                                app:cornerRadius="12dp"
+                                android:text="@string/save"/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnLoad"
+                                style="@style/Widget.MaterialComponents.Button"
+                                android:layout_width="0dp"
+                                android:layout_height="@dimen/button_height_secondary"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                app:cornerRadius="12dp"
+                                android:text="@string/load"/>
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </ScrollView>
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/canvasCard"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="@dimen/screen_padding"
+        android:layout_marginTop="@dimen/screen_padding"
+        android:layout_marginEnd="@dimen/screen_padding"
+        android:layout_marginBottom="8dp"
+        app:cardBackgroundColor="@color/canvas_bg"
+        app:cardCornerRadius="@dimen/canvas_corner_radius"
+        app:cardElevation="3dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/toolbar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.sandblaze.whiteboard.presentation.WhiteboardCanvasView
+            android:id="@+id/whiteboardView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/canvas_bg"/>
     </com.google.android.material.card.MaterialCardView>
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 
