@@ -11,9 +11,11 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.graphics.withSave
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -24,7 +26,6 @@ import com.sandblaze.whiteboard.domain.model.Point
 import com.sandblaze.whiteboard.domain.model.Rect
 import com.sandblaze.whiteboard.domain.model.ShapeEntity
 import com.sandblaze.whiteboard.domain.model.TextEntity
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -100,23 +101,21 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         val owner = lifecycleOwner ?: return
 
         owner.lifecycleScope.launch {
-            combine(viewModel.state, viewModel.tool, viewModel.strokeWidth, viewModel.color) { state, tool, width, color ->
-                Quad(state, tool, width, color)
-            }.collect { quad ->
-                activeTool = quad.tool
-                activeStrokeWidthPx = quad.width
-                activeColor = quad.color
-                invalidate()
+            owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    activeTool = state.selectedTool
+                    activeStrokeWidthPx = state.strokeWidth
+                    activeColor = state.selectedColor
+                    invalidate()
+                }
             }
         }
     }
 
-
-
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val vm = viewModel ?: return
-        val state = vm.state.value
+        val state = vm.uiState.value.whiteboardState
         canvas.withSave {
             canvas.scale(viewportScale, viewportScale)
             canvas.translate(-viewportOffsetX, -viewportOffsetY)
@@ -143,6 +142,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
             // Shapes
             shapePaint.strokeWidth = max(2f, activeStrokeWidthPx)
             for (shape in state.shapes) {
+                shapePaint.color = Color.parseColor(shape.color.value)
                 shape.draw(canvas, shapePaint)
             }
 
@@ -351,7 +351,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
 
                     val deleted = charIndexForErase(
                         point,
-                        vm.state.value.texts[textIdx],
+                        vm.uiState.value.whiteboardState.texts[textIdx],
                         scaledDensity = resources.displayMetrics.scaledDensity
                     )
                     deleted?.let { range ->
@@ -383,9 +383,9 @@ class WhiteboardCanvasView @JvmOverloads constructor(
                 val textIdx = findTextIndexAtPoint(point, vm)
                 if (textIdx != null) {
                     val activeIdx = erasingTextIndex ?: textIdx
-                    val text = vm.state.value.texts.getOrNull(activeIdx) ?: run {
+                    val text = vm.uiState.value.whiteboardState.texts.getOrNull(activeIdx) ?: run {
                         // activeIdx may be stale if chars were deleted; fall back to current hit
-                        val t = vm.state.value.texts.getOrNull(textIdx) ?: return
+                        val t = vm.uiState.value.whiteboardState.texts.getOrNull(textIdx) ?: return
                         val range = charIndexForErase(point, t, resources.displayMetrics.scaledDensity) ?: return
                         vm.eraseTextRange(textIdx, range.startInclusive, range.endExclusive)
                         return
@@ -504,7 +504,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
 
 
     private fun findTextIndexAtPoint(point: Point, vm: WhiteboardViewModel): Int? {
-        val texts = vm.state.value.texts
+        val texts = vm.uiState.value.whiteboardState.texts
         val scaledDensity = resources.displayMetrics.scaledDensity
 
         // Check in reverse so topmost text gets hit first
@@ -547,13 +547,13 @@ class WhiteboardCanvasView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 android.util.Log.d("TextDebug", "Touch down at world: $point")
-                android.util.Log.d("TextDebug", "All texts: ${vm.state.value.texts.map { "${it.text} @ ${it.position}" }}")
+                android.util.Log.d("TextDebug", "All texts: ${vm.uiState.value.whiteboardState.texts.map { "${it.text} @ ${it.position}" }}")
 
                 val idx = findTextIndexAtPoint(point, vm)  // ← use this instead of vm.findTextIndexNear
                 android.util.Log.d("TextDebug", "Hit index: $idx")
 
                 if (idx != null) {
-                    val text = vm.state.value.texts[idx]
+                    val text = vm.uiState.value.whiteboardState.texts[idx]
                     draggingTextIndex = idx
                     draggingTextOffset = Point(point.x - text.position.x, point.y - text.position.y)
                     textDragDidMove = false
@@ -639,7 +639,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
     }
 
     private fun showEditTextDialog(vm: WhiteboardViewModel, index: Int, anchor: Point) {
-        val existing = vm.state.value.texts.getOrNull(index) ?: return
+        val existing = vm.uiState.value.whiteboardState.texts.getOrNull(index) ?: return
         showTextEditorDialog(
             context = context,
             title = "Edit text",
@@ -677,7 +677,7 @@ class WhiteboardCanvasView @JvmOverloads constructor(
 
                     vm.beginGesture()
 
-                    val shape = vm.state.value.shapes[selectedIdx]
+                    val shape = vm.uiState.value.whiteboardState.shapes[selectedIdx]
                     val bounds = ShapeInteraction.bounds(shape)
                     val fixed = ShapeInteraction.fixedCornerForResize(point, bounds, handleTol)
                     shapeResizeFixedCorner = fixed
@@ -739,13 +739,6 @@ class WhiteboardCanvasView @JvmOverloads constructor(
             }
         }
     }
-
-    private data class Quad(
-        val state: com.sandblaze.whiteboard.domain.model.WhiteboardState,
-        val tool: Tool,
-        val width: Float,
-        val color: ColorHex
-    )
 
 }
 

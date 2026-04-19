@@ -1,5 +1,8 @@
 package com.sandblaze.whiteboard.domain.model
 
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
@@ -65,6 +68,7 @@ sealed interface ShapeEntity {
     val color: ColorHex
 
     fun hitTest(point: Point, radiusPx: Float): Boolean
+    fun draw(canvas: Canvas, paint: Paint)
 
     data class Rectangle(
         val rect: Rect,
@@ -72,6 +76,10 @@ sealed interface ShapeEntity {
     ) : ShapeEntity {
         override fun hitTest(point: Point, radiusPx: Float): Boolean {
             return rect.expandedBy(radiusPx).contains(point.x, point.y)
+        }
+
+        override fun draw(canvas: Canvas, paint: Paint) {
+            canvas.drawRect(rect.left, rect.top, rect.right, rect.bottom, paint)
         }
     }
 
@@ -83,6 +91,10 @@ sealed interface ShapeEntity {
         override fun hitTest(point: Point, radiusPx: Float): Boolean {
             val d = hypot((point.x - center.x).toDouble(), (point.y - center.y).toDouble()).toFloat()
             return d <= radius + radiusPx
+        }
+
+        override fun draw(canvas: Canvas, paint: Paint) {
+            canvas.drawCircle(center.x, center.y, radius, paint)
         }
     }
 
@@ -112,6 +124,10 @@ sealed interface ShapeEntity {
             val d = hypot((px - cx).toDouble(), (py - cy).toDouble()).toFloat()
             return d <= radiusPx
         }
+
+        override fun draw(canvas: Canvas, paint: Paint) {
+            canvas.drawLine(start.x, start.y, end.x, end.y, paint)
+        }
     }
 
     data class Polygon(
@@ -121,6 +137,18 @@ sealed interface ShapeEntity {
     ) : ShapeEntity {
         override fun hitTest(point: Point, radiusPx: Float): Boolean {
             return bounds.expandedBy(radiusPx).contains(point.x, point.y)
+        }
+
+        override fun draw(canvas: Canvas, paint: Paint) {
+            val vertices = vertices()
+            if (vertices.isEmpty()) return
+            val path = Path()
+            path.moveTo(vertices.first().x, vertices.first().y)
+            for (i in 1 until vertices.size) {
+                path.lineTo(vertices[i].x, vertices[i].y)
+            }
+            path.close()
+            canvas.drawPath(path, paint)
         }
 
         fun vertices(): List<Point> {
