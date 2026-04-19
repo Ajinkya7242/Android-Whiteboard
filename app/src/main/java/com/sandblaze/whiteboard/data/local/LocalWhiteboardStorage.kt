@@ -12,14 +12,17 @@ import com.sandblaze.whiteboard.domain.model.ShapeEntity
 import com.sandblaze.whiteboard.domain.model.StrokeEntity
 import com.sandblaze.whiteboard.domain.model.TextEntity
 import com.sandblaze.whiteboard.domain.model.WhiteboardState
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import javax.inject.Inject
 
-class LocalWhiteboardStorage(
-    private val context: Context
-) {
+class LocalWhiteboardStorage @Inject constructor(
+    @ApplicationContext private val context: Context
+) : WhiteboardStorage {
+
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
     private fun directory(): File {
@@ -29,26 +32,25 @@ class LocalWhiteboardStorage(
         return dir
     }
 
-    fun save(state: WhiteboardState): File {
+    override fun save(state: WhiteboardState): File {
         val name = "whiteboard_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.json"
         val out = File(directory(), name)
         out.writeText(gson.toJson(state.toJsonObject()))
         return out
     }
 
-    fun listSaved(): List<File> {
+    override fun listSaved(): List<File> {
         val files = directory().listFiles { f -> f.isFile && f.name.endsWith(".json") }.orEmpty()
         return files.sortedByDescending { it.lastModified() }
     }
 
-    fun load(file: File): WhiteboardState {
+    override fun load(file: File): WhiteboardState {
         val obj = gson.fromJson(file.readText(), JsonObject::class.java)
         return obj.toWhiteboardState()
     }
 
     private fun WhiteboardState.toJsonObject(): JsonObject {
         val root = JsonObject()
-
         val strokesArray = JsonArray()
         for (stroke in strokes) {
             val s = JsonObject()
@@ -110,7 +112,6 @@ class LocalWhiteboardStorage(
             textsArray.add(t)
         }
         root.add("texts", textsArray)
-
         return root
     }
 
@@ -137,34 +138,21 @@ class LocalWhiteboardStorage(
                 "rectangle" -> {
                     val tl = s.getAsJsonArray("topLeft") ?: return@mapNotNull null
                     val br = s.getAsJsonArray("bottomRight") ?: return@mapNotNull null
-                    ShapeEntity.Rectangle(
-                        rect = Rect(tl[0].asFloat, tl[1].asFloat, br[0].asFloat, br[1].asFloat),
-                        color = color
-                    )
+                    ShapeEntity.Rectangle(rect = Rect(tl[0].asFloat, tl[1].asFloat, br[0].asFloat, br[1].asFloat), color = color)
                 }
                 "circle" -> {
                     val c = s.getAsJsonArray("center") ?: return@mapNotNull null
-                    val radius = s.get("radius")?.asFloat ?: 0f
-                    ShapeEntity.Circle(center = Point(c[0].asFloat, c[1].asFloat), radius = radius, color = color)
+                    ShapeEntity.Circle(center = Point(c[0].asFloat, c[1].asFloat), radius = s.get("radius")?.asFloat ?: 0f, color = color)
                 }
                 "line" -> {
                     val st = s.getAsJsonArray("start") ?: return@mapNotNull null
                     val en = s.getAsJsonArray("end") ?: return@mapNotNull null
-                    ShapeEntity.Line(
-                        start = Point(st[0].asFloat, st[1].asFloat),
-                        end = Point(en[0].asFloat, en[1].asFloat),
-                        color = color
-                    )
+                    ShapeEntity.Line(start = Point(st[0].asFloat, st[1].asFloat), end = Point(en[0].asFloat, en[1].asFloat), color = color)
                 }
                 "polygon" -> {
                     val tl = s.getAsJsonArray("topLeft") ?: return@mapNotNull null
                     val br = s.getAsJsonArray("bottomRight") ?: return@mapNotNull null
-                    val sides = s.get("sides")?.asInt ?: 5
-                    ShapeEntity.Polygon(
-                        bounds = Rect(tl[0].asFloat, tl[1].asFloat, br[0].asFloat, br[1].asFloat),
-                        sides = sides,
-                        color = color
-                    )
+                    ShapeEntity.Polygon(bounds = Rect(tl[0].asFloat, tl[1].asFloat, br[0].asFloat, br[1].asFloat), sides = s.get("sides")?.asInt ?: 5, color = color)
                 }
                 else -> null
             }
@@ -184,4 +172,3 @@ class LocalWhiteboardStorage(
         return WhiteboardState(strokes = strokes, shapes = shapes, texts = texts)
     }
 }
-

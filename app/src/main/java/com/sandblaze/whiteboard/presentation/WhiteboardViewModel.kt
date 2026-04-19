@@ -1,236 +1,148 @@
 package com.sandblaze.whiteboard.presentation
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.sandblaze.whiteboard.data.WhiteboardRepositoryImpl
-import com.sandblaze.whiteboard.data.local.LocalWhiteboardStorage
+import com.sandblaze.whiteboard.core.WhiteboardConfig
 import com.sandblaze.whiteboard.domain.model.ColorHex
 import com.sandblaze.whiteboard.domain.model.Point
+import com.sandblaze.whiteboard.domain.model.Rect
 import com.sandblaze.whiteboard.domain.model.ShapeEntity
 import com.sandblaze.whiteboard.domain.model.StrokeEntity
-import com.sandblaze.whiteboard.domain.model.Rect
 import com.sandblaze.whiteboard.domain.model.TextEntity
 import com.sandblaze.whiteboard.domain.model.WhiteboardState
+import com.sandblaze.whiteboard.domain.usecase.ListSavedWhiteboardsUseCase
+import com.sandblaze.whiteboard.domain.usecase.LoadLatestWhiteboardUseCase
+import com.sandblaze.whiteboard.domain.usecase.LoadWhiteboardByFileNameUseCase
+import com.sandblaze.whiteboard.domain.usecase.SaveWhiteboardUseCase
 import com.sandblaze.whiteboard.domain.usecase.WhiteboardStateReducer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class WhiteboardViewModel(
-    private val repository: WhiteboardRepositoryImpl
+@HiltViewModel
+class WhiteboardViewModel @Inject constructor(
+    private val saveWhiteboardUseCase: SaveWhiteboardUseCase,
+    private val loadLatestWhiteboardUseCase: LoadLatestWhiteboardUseCase,
+    private val loadWhiteboardByFileNameUseCase: LoadWhiteboardByFileNameUseCase,
+    private val listSavedWhiteboardsUseCase: ListSavedWhiteboardsUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WhiteboardState.empty())
-    val state: StateFlow<WhiteboardState> = _state
+    val state: StateFlow<WhiteboardState> = _state.asStateFlow()
+
+    private val _uiEvent = MutableSharedFlow<UiEvent>(
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val uiEvent: SharedFlow<UiEvent> = _uiEvent.asSharedFlow()
 
     private val undoStack = ArrayDeque<WhiteboardState>()
     private val redoStack = ArrayDeque<WhiteboardState>()
-
-    // Used to group continuous gesture updates (dragging) into a single undo step.
     private var gestureBaseState: WhiteboardState? = null
 
     private val _tool = MutableStateFlow<Tool>(Tool.Draw)
-    val tool: StateFlow<Tool> = _tool
+    val tool: StateFlow<Tool> = _tool.asStateFlow()
 
-    private val _strokeWidth = MutableStateFlow(6f)
-    val strokeWidth: StateFlow<Float> = _strokeWidth
+    private val _strokeWidth = MutableStateFlow(WhiteboardConfig.DEFAULT_STROKE_WIDTH_PX)
+    val strokeWidth: StateFlow<Float> = _strokeWidth.asStateFlow()
 
     private val _color = MutableStateFlow(ColorHex("#000000"))
-    val color: StateFlow<ColorHex> = _color
+    val color: StateFlow<ColorHex> = _color.asStateFlow()
 
     fun beginGesture() {
-        if (gestureBaseState == null) {
-            gestureBaseState = _state.value
-        }
+        if (gestureBaseState == null) gestureBaseState = _state.value
     }
 
     fun endGesture() {
         val base = gestureBaseState ?: return
         gestureBaseState = null
-
-        val current = _state.value
-        if (current != base) {
-            undoStack.addLast(base)
-            redoStack.clear()
-        }
+        if (_state.value != base) { undoStack.addLast(base); redoStack.clear() }
     }
 
     private fun setState(next: WhiteboardState) {
         val current = _state.value
         if (next == current) return
-
-        if (gestureBaseState != null) {
-            _state.value = next
-            return
-        }
-
+        if (gestureBaseState != null) { _state.value = next; return }
         undoStack.addLast(current)
-        if (undoStack.size > 50) undoStack.removeFirst()
+        if (undoStack.size > WhiteboardConfig.MAX_UNDO_STACK_SIZE) undoStack.removeFirst()
         redoStack.clear()
         _state.value = next
     }
 
     fun undo() {
         if (undoStack.isEmpty()) return
-        val current = _state.value
-        val prev = undoStack.removeLast()
-        redoStack.addLast(current)
-        _state.value = prev
+        redoStack.addLast(_state.value)
+        _state.value = undoStack.removeLast()
     }
 
     fun redo() {
         if (redoStack.isEmpty()) return
-        val current = _state.value
-        val next = redoStack.removeLast()
-        undoStack.addLast(current)
-        _state.value = next
+        undoStack.addLast(_state.value)
+        _state.value = redoStack.removeLast()
     }
 
-    fun setTool(tool: Tool) {
-        _tool.value = tool
-    }
-
-    fun setStrokeWidth(width: Float) {
-        _strokeWidth.value = width
-    }
-
-    fun setColor(colorHex: String) {
-        _color.value = ColorHex(colorHex)
-    }
+    fun setTool(tool: Tool) { _tool.value = tool }
+    fun setStrokeWidth(width: Float) { _strokeWidth.value = width }
+    fun setColor(colorHex: String) { _color.value = ColorHex(colorHex) }
 
     fun commitStroke(points: List<Point>) {
         if (points.size < 2) return
-        val stroke = StrokeEntity(
-            points = points,
-            color = _color.value,
-            width = _strokeWidth.value
-        )
-        val next = _state.value.copy(strokes = _state.value.strokes + stroke)
-        setState(next)
+        setState(_state.value.copy(strokes = _state.value.strokes + StrokeEntity(points, _color.value, _strokeWidth.value)))
     }
 
-    fun commitShape(shape: ShapeEntity) {
-        val current = _state.value
-        setState(current.copy(shapes = current.shapes + shape))
-    }
+    fun commitShape(shape: ShapeEntity) = setState(_state.value.copy(shapes = _state.value.shapes + shape))
+    fun commitText(text: TextEntity) = setState(_state.value.copy(texts = _state.value.texts + text))
 
-    fun commitText(text: TextEntity) {
-        val current = _state.value
-        setState(current.copy(texts = current.texts + text))
-    }
+    fun findTextIndexNear(point: Point, radiusPx: Float): Int? =
+        _state.value.texts.indices.reversed().firstOrNull { _state.value.texts[it].hitTest(point, radiusPx) }
 
-    fun findTextIndexNear(point: Point, radiusPx: Float): Int? {
-        val texts = _state.value.texts
-        for (i in texts.indices.reversed()) {
-            if (texts[i].hitTest(point, radiusPx)) return i
-        }
-        return null
-    }
+    fun moveText(index: Int, newPosition: Point) = setState(WhiteboardStateReducer.moveText(_state.value, index, newPosition))
+    fun updateText(index: Int, newValue: String, color: ColorHex, sizeSp: Float) = setState(WhiteboardStateReducer.updateText(_state.value, index, newValue, color, sizeSp))
+    fun eraseTextRange(index: Int, startInclusive: Int, endExclusive: Int) = setState(WhiteboardStateReducer.eraseTextRange(_state.value, index, startInclusive, endExclusive))
 
-    fun moveText(index: Int, newPosition: Point) {
-        val current = _state.value
-        setState(WhiteboardStateReducer.moveText(current, index, newPosition))
-    }
+    fun findShapeIndexNear(point: Point, radiusPx: Float): Int? =
+        _state.value.shapes.indices.reversed().firstOrNull { _state.value.shapes[it].hitTest(point, radiusPx) }
 
-    fun editText(index: Int, newValue: String) {
-        val value = newValue.trim()
-        if (value.isEmpty()) return
-        val current = _state.value
-        if (index !in current.texts.indices) return
-        val updated = current.texts.toMutableList()
-        updated[index] = updated[index].copy(text = value)
-        setState(current.copy(texts = updated))
-    }
+    fun moveShape(index: Int, dx: Float, dy: Float) = setState(WhiteboardStateReducer.moveShape(_state.value, index, dx, dy))
+    fun resizeShape(index: Int, newBounds: Rect) = setState(WhiteboardStateReducer.resizeShape(_state.value, index, newBounds))
+    fun eraseAt(point: Point, radiusPx: Float) = setState(WhiteboardStateReducer.eraseAt(_state.value, point, radiusPx))
 
-    fun updateText(index: Int, newValue: String, color: ColorHex, sizeSp: Float) {
-        val current = _state.value
-        setState(WhiteboardStateReducer.updateText(current, index, newValue, color, sizeSp))
-    }
-
-    /**
-     * Removes a character range from a text entity.
-     * If the resulting string becomes empty, the whole text entity is removed.
-     */
-    fun eraseTextRange(index: Int, startInclusive: Int, endExclusive: Int) {
-        val current = _state.value
-        setState(WhiteboardStateReducer.eraseTextRange(current, index, startInclusive, endExclusive))
-    }
-
-    fun findShapeIndexNear(point: Point, radiusPx: Float): Int? {
-        val shapes = _state.value.shapes
-        for (i in shapes.indices.reversed()) {
-            if (shapes[i].hitTest(point, radiusPx)) return i
-        }
-        return null
-    }
-
-    fun moveShape(index: Int, dx: Float, dy: Float) {
-        val current = _state.value
-        setState(WhiteboardStateReducer.moveShape(current, index, dx, dy))
-    }
-
-    fun resizeShape(index: Int, newBounds: Rect) {
-        val current = _state.value
-        setState(WhiteboardStateReducer.resizeShape(current, index, newBounds))
-    }
-
-    fun eraseAt(point: Point, radiusPx: Float) {
-        val current = _state.value
-        setState(WhiteboardStateReducer.eraseAt(current, point, radiusPx))
-    }
-
-    fun save(onSuccess: () -> Unit, onError: (Throwable) -> Unit) {
+    fun save() {
         viewModelScope.launch {
-            runCatching { repository.save(_state.value) }
-                .onSuccess { onSuccess() }
-                .onFailure { onError(it) }
+            saveWhiteboardUseCase(_state.value)
+                .onSuccess { _uiEvent.emit(UiEvent.SaveSuccess(it)) }
+                .onFailure { _uiEvent.emit(UiEvent.SaveError(it.message ?: "Unknown error")) }
         }
     }
 
-    fun loadLatest(onSuccess: () -> Unit, onError: (Throwable) -> Unit) {
+    fun loadLatest() {
         viewModelScope.launch {
-            runCatching { repository.loadLatest() }
-                .onSuccess { loaded ->
-                    _state.value = loaded
-                    onSuccess()
-                }
-                .onFailure { onError(it) }
+            loadLatestWhiteboardUseCase()
+                .onSuccess { _state.value = it; _uiEvent.emit(UiEvent.LoadSuccess) }
+                .onFailure { _uiEvent.emit(UiEvent.LoadError(it.message ?: "Unknown error")) }
         }
     }
 
-    fun listSavedFileNames(onSuccess: (List<String>) -> Unit, onError: (Throwable) -> Unit) {
+    fun listSavedFileNames() {
         viewModelScope.launch {
-            runCatching { repository.listSavedFiles().map { it.name } }
-                .onSuccess { onSuccess(it) }
-                .onFailure { onError(it) }
+            listSavedWhiteboardsUseCase()
+                .onSuccess { _uiEvent.emit(UiEvent.FilesListed(it)) }
+                .onFailure { _uiEvent.emit(UiEvent.FileListError(it.message ?: "No saved files found.")) }
         }
     }
 
-    fun loadByFileName(fileName: String, onSuccess: () -> Unit, onError: (Throwable) -> Unit) {
+    fun loadByFileName(fileName: String) {
         viewModelScope.launch {
-            runCatching { repository.loadByFileName(fileName) }
-                .onSuccess {
-                    _state.value = it
-                    onSuccess()
-                }
-                .onFailure { onError(it) }
-        }
-    }
-
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            val storage = LocalWhiteboardStorage(appContext)
-            val repo = WhiteboardRepositoryImpl(storage)
-            return object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return WhiteboardViewModel(repo) as T
-                }
-            }
+            loadWhiteboardByFileNameUseCase(fileName)
+                .onSuccess { _state.value = it; _uiEvent.emit(UiEvent.LoadSuccess) }
+                .onFailure { _uiEvent.emit(UiEvent.LoadError(it.message ?: "Unknown error")) }
         }
     }
 }
-
